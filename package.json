@@ -1,0 +1,60 @@
+{
+  "name": "perlin-experiment-2",
+  "version": "1.0.0",
+  "private": false,
+  "description": "Another attempt in using Perlin noise.",
+  "main": "dist/index.html",
+  "scripts": {
+    "clean:js": "rimraf dist",
+    "fmt": "cd src && cargo +nightly fmt",
+    "clippy": "cd src && cargo clippy",
+    "prettier": "prettier --write \"*.{js,md,json}\" \"js/*.{css,html,js}\"",
+    "build:css": "postcss styles --dir dist/css",
+    "watch:css": "nodemon -x $npm_execpath run build:css -e css,html -w styles -w js",
+    "watch:js": "NODE_ENV=development webpack serve",
+    "dev": "concurrently \"$npm_execpath run watch:css\" \"$npm_execpath run watch:js\"",
+    "build": "rimraf dist pkg && $npm_execpath run build:css && NODE_ENV=production webpack",
+    "test": "cargo test && wasm-pack test --headless --firefox"
+  },
+  "repository": "https://github.com/minagawah/perlin-experiment-2.git",
+  "keywords": [
+    "perlin-noise",
+    "wasm-pack",
+    "web-sys",
+    "wasm-bindgen"
+  ],
+  "author": "minagawah <minag@tokyo800.jp>",
+  "license": "(Unlicense OR MIT)",
+  "bugs": {
+    "url": "https://github.com/minagawah/perlin-experiment-2/issues"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.21.0",
+    "@babel/core": "^7.21.0",
+    "@babel/preset-env": "^7.20.2",
+    "@wasm-tool/wasm-pack-plugin": "^1.6.0",
+    "autoprefixer": "^10.4.13",
+    "babel-loader": "^9.1.2",
+    "clean-webpack-plugin": "^4.0.0",
+    "concurrently": "^7.6.0",
+    "css-loader": "^6.7.3",
+    "file-loader": "^6.2.0",
+    "html-webpack-plugin": "^5.5.0",
+    "nodemon": "^2.0.21",
+    "postcss-cli": "^10.1.0",
+    "postcss-import": "^15.1.0",
+    "postcss-loader": "^7.0.2",
+    "postcss-mixins": "^9.0.4",
+    "postcss-preset-env": "^8.0.1",
+    "prettier": "^2.8.4",
+    "rimraf": "^4.1.2",
+    "style-loader": "^3.3.1",
+    "tailwindcss": "^3.2.7",
+    "webpack": "^5.75.0",
+    "webpack-cli": "^5.0.1",
+    "webpack-dev-server": "^4.11.1"
+  },
+  "dependencies": {
+    "core-js": "^3.29.1"
+  }
+}

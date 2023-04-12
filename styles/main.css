@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: #262621;
+  margin: 0;
+  padding: 0;
+  min-width: fit-content;
+  width: 100%;
+  font-family: 'Work Sans',
+    /*
+                  * "-apple-system" targets San Francisco
+                  * in Safari on Mac OS X and iOS, and
+                  * Neue Helvetica and Lucida Grande on older
+                  * versions of Mac OS X. It properly selects
+                  * between San Francisco Text
+                  * and San Francisco Display.
+                  */ -apple-system,
+    /* For Chrome on Mac OS X */ BlinkMacSystemFont,
+    /* Microsoft Windows and Windows Phone */ 'Segoe UI', /* Android */ 'Roboto',
+    /* KDE */ 'Oxygen', 'Ubuntu', /* Fedora */ 'Cantarell',
+    /* FirefoxOS */ 'Fira Sans', /* Android 2 */ 'Droid Sans',
+    /* MacOS 2 */ 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: 0.05rem;
+}
+
+* {
+  box-sizing: border-box;
+  line-height: 1.2;
+}
+
+a,
+a:visited,
+a:hover,
+a:active {
+  text-decoration: underline;
+  color: #dedede;
+}
+
+@define-mixin generic-content-wrapper {
+  width: 99%;
+  @media (min-width: 768px) {
+    width: 85%;
+    max-width: 1024px;
+  }
+}
+
+#container {
+  @apply w-full flex flex-col justify-start items-center;
+}
+
+#content {
+  @mixin generic-content-wrapper;
+  @apply flex flex-col justify-start items-start text-lg;
+}
+
+#perlin-experiment {
+  @apply w-full bg-black;
+  height: 65vh;
+  max-height: 900px;
+}
