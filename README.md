@@ -244,7 +244,135 @@ and for `draw()`, we are drawing particles and sticks.
     }
 ```
 
-## 4. What I did
+## 4. Notes
+
+### 4-1. You want to use WASM app in different project
+
+Sometimes:
+
+1. You want to use `wasm-pack` instead of `wasm-pack-plugin`.
+1. You want no bundled JS, but import WASM app directly from your HTML page.
+
+Well, that was exactly what I wanted...  
+I wanted this Perlin noise sample app running on
+[my website](https://www.astralscience.com/),
+but instead of hard-wiring the WASM app
+into my Webpack project (using `wasm-pack-plugin`),
+I wanted to directly build the app using `wasm-pack`
+so that binaries were to be emitted into a specified folder.
+
+Here are the solutions:
+
+#### (1) Build with `wasm-pack`
+
+First, take a look at the directory structure:
+
+```
+├── client/
+|  └── perlin-noise-particles/
+|    ├── Cargo.toml
+|    └── src/
+|      ├── app.rs
+|      ├── canvas.rs
+|      ├── lib.rs
+|      ├── proxy.rs
+|      └── utils.rs
+|
+├── server/
+|  ├── public/
+|  |  ├── css/
+|  |  ├── js/
+|  |  ├── wasm/
+|  |  |  └── perlin-noise-particles/
+|  |  |     └── # ...(binaries)
+|  |  |
+|  |  └── index.html
+|  ├── routes/
+|  └── views/
+|
+└── build_wasm.sh
+```
+
+Here I have the source in `client/perlin-noise-particles`.  
+I want to build it and emit binaries to `server/public/wasm`.  
+To do so, I have a tiny script (called `build_wasm.sh`):
+
+```bash
+#!/usr/bin/env bash
+
+APP=${1%\/}
+PROFILE=${2:=debug}
+
+ROOT_DIR="$PWD"
+
+SRC_DIR="$ROOT_DIR/client/$APP"
+OUT_DIR="$ROOT_DIR/server/public/wasm/$APP"
+
+cd "$SRC_DIR"
+wasm-pack build "--$PROFILE" --target web --out-name "$APP" --out-dir "$OUT_DIR"
+```
+
+Running it, I get the binaries in desired folder:
+
+```shell
+sh ./build_wasm.sh perlin-noise-particles release
+```
+
+#### (2) Import from HTML page
+
+Bellow is the original JS file that we have in this sample app, right?
+For this, Webpack would bootstrap the WASM app at compile-time.
+
+```js
+import('../dist/pkg').catch(console.error);
+
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const wasm = await import('../dist/pkg');
+    const app = new wasm.App({ bgcolor: '#202020', color: '#ffffff' });
+    app.start();
+  } catch (err) {
+    console.error(err);
+  }
+});
+```
+
+Instead, we want to look up the WASM app at _runtime_.  
+So, here's what I have:
+
+```html
+<html>
+  <body>
+    <canvas id="perlin-noise-particles"></canvas>
+
+    <script type="module">
+      import init, {
+        App,
+      } from './wasm/perlin-noise-particles/perlin-noise-particles.js';
+
+      import('./wasm/perlin-noise-particles/perlin-noise-particles.js').catch(
+        console.error
+      );
+
+      document.addEventListener('DOMContentLoaded', async () => {
+        try {
+          await init();
+
+          const app = new App({ bgcolor: '#000084', color: '#ffffff' });
+          app.start();
+        } catch (err) {
+          console.error(err);
+        }
+      });
+    </script>
+  </body>
+</html>
+```
+
+Notice that I use `<script type="module">` so that the browser
+would understand the `import` syntax.
+
+## 5. What I did
 
 ### Rust + wasm-pack
 
@@ -305,7 +433,7 @@ npm install --save-dev @babel/cli @babel/core @babel/preset-env \
   @wasm-tool/wasm-pack-plugin
 ```
 
-## 4. License
+## 6. License
 
 Dual-licensed under either of the followings.  
 Choose at your option.

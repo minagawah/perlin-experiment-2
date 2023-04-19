@@ -6,7 +6,7 @@ use wasm_bindgen::JsValue;
 use crate::canvas::Canvas;
 use crate::utils::{get_canvas, request_animation_frame_future, timer};
 
-const REFRESH_RATE: i32 = 65;
+const REFRESH_RATE: i32 = 60;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {

@@ -6,6 +6,7 @@
 /// where sticks are equally spread. Although sticks
 /// have fixed positions, angles are of particles
 /// (for sticks to indicate the particle flow).
+use lerp::Lerp;
 use noise::{NoiseFn, Perlin};
 use rand::distributions::Uniform;
 use rand::Rng;
@@ -17,6 +18,8 @@ use std::time::Duration;
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::JsCast;
 use web_sys::{console, CanvasRenderingContext2d, HtmlCanvasElement};
+// use kdtree::distance::squared_euclidean;
+// use kdtree::KdTree;
 
 use crate::utils::{
     color_change_intensity_hex, debounce, device_pixel_ratio, get_canvas_size,
@@ -24,8 +27,9 @@ use crate::utils::{
 };
 
 const NUM_OF_PARTICLES: usize = 150;
-const SECOND_COLOR_INTENSITY: f64 = 0.4;
-const STICK_SIZE_RATIO: f64 = 0.8;
+const SECOND_COLOR_INTENSITY: f64 = 0.5;
+
+const SPEED: f64 = 3.0;
 
 const PARTICLE_SIZE_MOBILE: f64 = 6.5;
 const PARTICLE_SIZE_DESKTOP: f64 = 3.5;
@@ -68,7 +72,6 @@ pub struct Canvas {
     pub frame: i32,
     pub particles: Vec<Particle>,
     pub unit_size: f64,
-    pub stick_size: f64,
     pub particle_size: f64,
     pub num_of_horizontal_grids: usize,
     pub num_of_vertical_grids: usize,
@@ -95,7 +98,6 @@ impl Canvas {
             frame: 0,
             particles: Vec::new(),
             unit_size: 1.0,
-            stick_size: 1.0,
             particle_size: 0.1,
             num_of_horizontal_grids: 10,
             num_of_vertical_grids: 10,
@@ -144,7 +146,6 @@ impl Canvas {
         let unit_size = width / grid_size;
 
         self.unit_size = unit_size;
-        self.stick_size = unit_size * STICK_SIZE_RATIO;
         self.particle_size = particle_size;
 
         self.num_of_horizontal_grids = (height / unit_size).ceil() as usize;
@@ -190,37 +191,41 @@ impl Canvas {
         self.frame += 1;
         let mut rng = rand::thread_rng();
 
-        for particle in &mut self.particles {
-            // Notice it keeps using random values
-            // for generating the noise.
-            // Otherwise, all the particles
-            // would eventually have the same
-            // positions and angles, and it would
-            // not look dynamic at all.
+        for p in &mut self.particles {
+            let w = self.width;
+            let h = self.height;
+
+            // Keep using random values when
+            // generating noise, otherwise,
+            // all particles would have the same
+            // positions and angles which
+            // would not look dynamic at all.
             let noise_val = self.noise.get([
-                (particle.x / self.width) + rng.gen_range(-0.1, 0.1),
-                (particle.y / self.height) + rng.gen_range(-0.1, 0.1),
+                (p.x / w) + rng.gen_range(-0.1, 0.1),
+                (p.y / h) + rng.gen_range(-0.1, 0.1),
                 self.frame as f64 / 100.0,
             ]);
 
             let angle = noise_val * PI * 2.0;
-            let speed = 3.0;
-            let (dx, dy) = (speed * angle.cos(), speed * angle.sin());
 
-            particle.x += dx * self.particle_size;
-            particle.y += dy * self.particle_size;
+            let (dx, dy) = (SPEED * angle.cos(), SPEED * angle.sin());
 
-            if particle.x < -self.particle_size {
-                particle.x = self.width + self.particle_size;
+            let size = self.particle_size;
+
+            p.x += dx * size;
+            p.y += dy * size;
+
+            if p.x < -size {
+                p.x = w + size;
             }
-            if particle.y < -self.particle_size {
-                particle.y = self.height + self.particle_size;
+            if p.y < -size {
+                p.y = h + size;
             }
-            if particle.x > self.width + self.particle_size {
-                particle.x = -self.particle_size;
+            if p.x > w + size {
+                p.x = -size;
             }
-            if particle.y > self.height + self.particle_size {
-                particle.y = -self.particle_size;
+            if p.y > h + size {
+                p.y = -size;
             }
         }
     }
@@ -243,6 +248,15 @@ impl Canvas {
         self.ctx.set_stroke_style(&self.color2.as_str().into());
         self.ctx.set_line_width(1.0);
 
+        let ripple_effect_range_max = 8.0 * self.unit_size;
+
+        // It was rather slower using 'kdtree'...
+
+        // let mut tree = KdTree::new(2);
+        // for (index, particle) in self.particles.iter().enumerate() {
+        //     tree.add([particle.x, particle.y], index).unwrap();
+        // }
+
         for i in 0..self.num_of_horizontal_grids {
             let y = i as f64 * self.unit_size;
             for j in 0..self.num_of_vertical_grids {
@@ -253,21 +267,29 @@ impl Canvas {
                     Rc::new(RefCell::new(&self.particles[0])),
                     Rc::new(RefCell::new(&self.particles[1])),
                 ];
-
                 let mut closest_dist = [f64::MAX, f64::MAX];
 
-                for particle in &self.particles {
-                    let distance = ((particle.x - x).powi(2)
-                        + (particle.y - y).powi(2))
-                    .sqrt();
-                    if distance < closest_dist[0] {
+                // let indices = tree
+                //     .within(
+                //         &[x, y],
+                //         ripple_effect_range_max * ripple_effect_range_max,
+                //         &squared_euclidean,
+                //     )
+                //     .unwrap();
+
+                // for (_, &index) in indices {
+                for p in &self.particles {
+                    // let p = &self.particles[index];
+                    let dist = ((p.x - x).powi(2) + (p.y - y).powi(2)).sqrt();
+
+                    if dist < closest_dist[0] {
                         closest_dist[1] = closest_dist[0];
                         closest_part[1] = closest_part[0].clone();
-                        closest_dist[0] = distance;
-                        closest_part[0] = Rc::new(RefCell::new(particle));
-                    } else if distance < closest_dist[1] {
-                        closest_dist[1] = distance;
-                        closest_part[1] = Rc::new(RefCell::new(particle));
+                        closest_dist[0] = dist;
+                        closest_part[0] = Rc::new(RefCell::new(p));
+                    } else if dist < closest_dist[1] {
+                        closest_dist[1] = dist;
+                        closest_part[1] = Rc::new(RefCell::new(p));
                     }
                 }
 
@@ -289,23 +311,35 @@ impl Canvas {
                 // This would result in a more gradual change
                 // in angle for the stick.
                 let mut angle = 0.0;
-                let total_distance = closest_dist[0] + closest_dist[1];
+                let total_dist = closest_dist[0] + closest_dist[1];
 
-                if total_distance > 0.0 {
-                    let weight0 = closest_dist[1] / total_distance;
-                    let weight1 = 1.0 - weight0;
-                    let particle0 = closest_part[0].borrow();
-                    let particle1 = closest_part[1].borrow();
-                    angle =
-                        particle0.angle * weight0 + particle1.angle * weight1;
+                if total_dist > 0.0 {
+                    let weight_0 = closest_dist[1] / total_dist;
+                    let weight_1 = 1.0 - weight_0;
+                    let part_0 = closest_part[0].borrow();
+                    let part_1 = closest_part[1].borrow();
+                    angle = part_0.angle * weight_0 + part_1.angle * weight_1;
                 }
+
+                // If the closest distance to particles is
+                // more than 8 units away, we want
+                // the length of the stick to be fixed to 2px.
+                // If not, then have a proportional size;
+                // closer to particles, bigger.
+                let dist_ratio = total_dist / ripple_effect_range_max;
+
+                let stick_size = self
+                    .unit_size
+                    .lerp(2.0, dist_ratio)
+                    .max(2.0)
+                    .min(self.unit_size);
 
                 self.ctx.save();
                 self.ctx.translate(x, y).unwrap_or(());
                 self.ctx.rotate(angle).unwrap_or(());
                 self.ctx.begin_path();
                 self.ctx.move_to(0_f64, 0_f64);
-                self.ctx.line_to(self.stick_size, 0_f64);
+                self.ctx.line_to(stick_size, 0_f64);
                 self.ctx.stroke();
                 self.ctx.restore();
             }
@@ -318,13 +352,13 @@ impl Canvas {
 
         let radius = self.particle_size / 2.0;
 
-        for particle in &self.particles {
+        for p in &self.particles {
             // Translate the canvas to the particle position.
             self.ctx.save();
-            self.ctx.translate(particle.x, particle.y).unwrap_or(());
+            self.ctx.translate(p.x, p.y).unwrap_or(());
 
             // Rotate the canvas based on the particle angle.
-            self.ctx.rotate(particle.angle).unwrap_or(());
+            self.ctx.rotate(p.angle).unwrap_or(());
 
             self.ctx.begin_path();
             self.ctx

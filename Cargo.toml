@@ -1,7 +1,7 @@
 [package]
 name = "perlin-experiment-2"
 description = "Another attempt in using Perlin noise."
-version = "1.0.0"
+version = "1.0.1"
 authors = ["minagawa <minag@tokyo800.jp>"]
 categories = ["wasm"]
 repository = "https://github.com/minagawah/perlin-experiment-2.git"
@@ -20,7 +20,9 @@ console_log = "^0.2"
 futures = "0.3.23"
 hex = "0.4.3"
 js-sys = "0.3.58"
+# kdtree = "0.6.0"
 noise = "0.7.0"
+lerp = "0.4.0"
 num = "0.4.0"
 serde = { version = "1.0.140", features = ["derive"] }
 serde-wasm-bindgen = "0.4"
