@@ -4,7 +4,9 @@ use std::rc::Rc;
 use wasm_bindgen::JsValue;
 
 use crate::canvas::Canvas;
-use crate::utils::{get_canvas, request_animation_frame_future, timer};
+use crate::utils::{
+    get_canvas, request_animation_frame_future, timer,
+};
 
 const REFRESH_RATE: i32 = 60;
 
@@ -23,14 +25,19 @@ pub struct Proxy {
 impl Proxy {
     pub fn new(params: &JsValue) -> Self {
         let config: Config =
-            serde_wasm_bindgen::from_value(params.clone()).unwrap();
+            serde_wasm_bindgen::from_value(
+                params.clone(),
+            )
+            .unwrap();
 
         let bgcolor: String = config.bgcolor.clone();
         let color: String = config.color;
 
-        let element = get_canvas("#perlin-experiment").unwrap();
-        let canvas =
-            Rc::new(RefCell::new(Canvas::new(element, bgcolor, color)));
+        let element =
+            get_canvas("#perlin-experiment").unwrap();
+        let canvas = Rc::new(RefCell::new(
+            Canvas::new(element, bgcolor, color),
+        ));
 
         canvas.borrow_mut().register_listeners();
         canvas.borrow_mut().update_size();

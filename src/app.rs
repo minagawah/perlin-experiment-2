@@ -14,9 +14,13 @@ pub struct App {
 #[wasm_bindgen]
 impl App {
     #[wasm_bindgen(constructor)]
-    pub fn new(params: &JsValue) -> Result<App, JsValue> {
+    pub fn new(
+        params: &JsValue,
+    ) -> Result<App, JsValue> {
         Ok(App {
-            proxy: Arc::new(Mutex::new(Proxy::new(params))),
+            proxy: Arc::new(Mutex::new(Proxy::new(
+                params,
+            ))),
         })
     }
 

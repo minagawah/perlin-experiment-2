@@ -1,11 +1,11 @@
-/// Drawing particles, positions and angles for which
-/// are constantly calculated by Perlin noise.
-/// Also, we are drawing sticks to indicate
-/// the current flow (angles) of the particles.
-/// To do so, we will have grids on the canvas screen
-/// where sticks are equally spread. Although sticks
-/// have fixed positions, angles are of particles
-/// (for sticks to indicate the particle flow).
+/// Using Perlin noise for organic-
+/// looking movement on particles.
+/// Also, drawing evenly spread
+/// sticks on the back which depict
+/// the current flow of the particles.
+/// Although the positions for the sticks
+/// are fixed, angles are taken from
+/// the closest particles.
 use lerp::Lerp;
 use noise::{NoiseFn, Perlin};
 use rand::distributions::Uniform;
@@ -17,13 +17,23 @@ use std::rc::Rc;
 use std::time::Duration;
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::JsCast;
-use web_sys::{console, CanvasRenderingContext2d, HtmlCanvasElement};
+use web_sys::{
+    console, CanvasRenderingContext2d,
+    HtmlCanvasElement,
+};
+
+// NOTE: Tried using 'KdTree' to create
+// a lookup table for particle positions
+// hoping to improve performance, but it
+// became ratther slower...
+//
 // use kdtree::distance::squared_euclidean;
 // use kdtree::KdTree;
 
 use crate::utils::{
-    color_change_intensity_hex, debounce, device_pixel_ratio, get_canvas_size,
-    get_ctx, get_window, lazy_round,
+    color_change_intensity_hex, debounce,
+    device_pixel_ratio, get_canvas_size, get_ctx,
+    get_window, lazy_round,
 };
 
 const NUM_OF_PARTICLES: usize = 150;
@@ -48,16 +58,15 @@ pub struct Particle {
     angle: f64,
 }
 
-// When a browser size changes, we want
-// to find out its width and height, and
-// will have to calculate some values required
-// for us to draw particles and sticks.
-// For 'unit_size' is calculated based
-// on the given width, and is the size
-// for each grid. 'stick_size' varies,
-// but for now, we want 0.8 of 'unit_size'.
-// 'particle_size' can have two variations;
-// smaller for desktop, and bigger for mobile.
+// As a browser resizes, we get
+// new width and height.
+// When it happens, we want
+// to calculate a new 'unit_size'
+// with which we determine
+// how many grids to draw
+// on the screen. This number
+// depends whether it is
+// for desktop or mobile.
 #[derive(Debug, Clone)]
 pub struct Canvas {
     pub dpr: f64,
@@ -78,10 +87,17 @@ pub struct Canvas {
 }
 
 impl Canvas {
-    pub fn new(el: HtmlCanvasElement, bgcolor: String, color: String) -> Self {
+    pub fn new(
+        el: HtmlCanvasElement,
+        bgcolor: String,
+        color: String,
+    ) -> Self {
         let ctx = get_ctx(&el).unwrap();
         let dpr: f64 = device_pixel_ratio();
-        let color2 = color_change_intensity_hex(&color, SECOND_COLOR_INTENSITY);
+        let color2 = color_change_intensity_hex(
+            &color,
+            SECOND_COLOR_INTENSITY,
+        );
 
         ctx.scale(dpr, dpr).unwrap_or(());
 
@@ -104,10 +120,12 @@ impl Canvas {
         }
     }
 
-    // We want to run 'update_size' as browser size changes.
-    // However, we want to debounce the event by 500 msec.
+    // Although we want 'update_size' to run
+    // as browser size changes, we want
+    // to debounce the event by 500 msec.
     pub fn register_listeners(&mut self) {
-        let self_rc = Rc::new(RefCell::new(self.clone()));
+        let self_rc =
+            Rc::new(RefCell::new(self.clone()));
 
         let mut debounced_update_size = debounce(
             move || {
@@ -117,24 +135,30 @@ impl Canvas {
             Duration::from_millis(500),
         );
 
-        let callback = Closure::wrap(Box::new(move || {
-            debounced_update_size();
-        }) as Box<dyn FnMut()>);
+        let callback =
+            Closure::wrap(Box::new(move || {
+                debounced_update_size();
+            })
+                as Box<dyn FnMut()>);
 
         get_window()
             .expect("No window")
-            .set_onresize(Some(callback.as_ref().unchecked_ref()));
+            .set_onresize(Some(
+                callback.as_ref().unchecked_ref(),
+            ));
 
-        callback.forget(); // prevent the closure from being dropped immediately
+        callback.forget(); // prevent closure being dropped soon
     }
 
     // Called when browser size changes.
     pub fn update_size(&mut self) {
-        let (w, h): (f64, f64) = get_canvas_size(&self.el);
+        let (w, h): (f64, f64) =
+            get_canvas_size(&self.el);
 
         self.frame = 0;
 
-        let (particle_size, grid_size) = if w < 768.0 {
+        let (particle_size, grid_size) = if w < 768.0
+        {
             (PARTICLE_SIZE_MOBILE, GRID_SIZE_MOBILE)
         } else {
             (PARTICLE_SIZE_DESKTOP, GRID_SIZE_DESKTOP)
@@ -148,12 +172,21 @@ impl Canvas {
         self.unit_size = unit_size;
         self.particle_size = particle_size;
 
-        self.num_of_horizontal_grids = (height / unit_size).ceil() as usize;
-        self.num_of_vertical_grids = (width / unit_size).ceil() as usize;
+        self.num_of_horizontal_grids =
+            (height / unit_size).ceil() as usize;
+        self.num_of_vertical_grids =
+            (width / unit_size).ceil() as usize;
 
-        self.particles = generate_particles(width, height, NUM_OF_PARTICLES);
+        self.particles = generate_particles(
+            width,
+            height,
+            NUM_OF_PARTICLES,
+        );
 
-        console::log_1(&("[canvas] Updating canvas size".into()));
+        console::log_1(
+            &("[canvas] Updating canvas size".into()),
+        );
+
         console::log_1(
             &(format!(
                 "[canvas] {} x {}",
@@ -164,19 +197,33 @@ impl Canvas {
         );
 
         console::log_1(
-            &(format!("[canvas] particle_size: {}", lazy_round(particle_size))
-                .into()),
+            &(format!(
+                "[canvas] particle_size: {}",
+                lazy_round(particle_size)
+            )
+            .into()),
         );
 
         console::log_1(
-            &(format!("[canvas] grid_size: {}", lazy_round(grid_size)).into()),
+            &(format!(
+                "[canvas] grid_size: {}",
+                lazy_round(grid_size)
+            )
+            .into()),
         );
 
+        // mosaikekkan
         // if let Err(err) = get_window().map(|window| {
-        //     window
-        //         .alert_with_message(&(format!("width: {}", lazy_round(width))))
+        //     window.alert_with_message(
+        //         &(format!(
+        //             "width: {}",
+        //             lazy_round(width)
+        //         )),
+        //     )
         // }) {
-        //     console::log_1(&(format!("ERR: {}", err).into()))
+        //     console::log_1(
+        //         &(format!("ERR: {}", err).into()),
+        //     )
         // }
 
         self.el.set_width(width as u32);
@@ -208,7 +255,10 @@ impl Canvas {
 
             let angle = noise_val * PI * 2.0;
 
-            let (dx, dy) = (SPEED * angle.cos(), SPEED * angle.sin());
+            let (dx, dy) = (
+                SPEED * angle.cos(),
+                SPEED * angle.sin(),
+            );
 
             let size = self.particle_size;
 
@@ -232,29 +282,48 @@ impl Canvas {
 
     // Repeatedly called from 'Proxy.run'.
     pub fn draw(&mut self) {
-        self.ctx.set_fill_style(&self.bgcolor.as_str().into());
-        self.ctx.fill_rect(0_f64, 0_f64, self.width, self.height);
+        self.ctx.set_fill_style(
+            &self.bgcolor.as_str().into(),
+        );
+        self.ctx.fill_rect(
+            0_f64,
+            0_f64,
+            self.width,
+            self.height,
+        );
 
         // ------------------------------------
         // Sticks
         // ------------------------------------
-        // We are drawing sticks to indicate the current
-        // flow of the particles. While we have a fixed
-        // positions for the sticks, we will look for
-        // the nearest particle(s) so that we can use
-        // the angle for the particle (actually, we are
-        // taking 2 particles to interpolate
-        // for the average angles for 2 particles).
-        self.ctx.set_stroke_style(&self.color2.as_str().into());
+        // Equally spreads 'sticks' are to be
+        // drawn on the screen to serve as
+        // an indicator for where particles
+        // are heading toward.
+        // They have fixed positions, but for
+        // angles, it looks for the closest
+        // particle, and use that angle.
+        // For smoother animations, we are
+        // taking 2 particles to interporate
+        // the average for these 2 particles.
+        self.ctx.set_stroke_style(
+            &self.color2.as_str().into(),
+        );
         self.ctx.set_line_width(1.0);
 
-        let ripple_effect_range_max = 8.0 * self.unit_size;
+        let ripple_effect_range_max =
+            8.0 * self.unit_size;
 
-        // It was rather slower using 'kdtree'...
-
+        // Tried using 'KdTree' hoping to improve
+        // performance, but it became rather
+        // slower...
+        //
+        // mosaikekkan
         // let mut tree = KdTree::new(2);
-        // for (index, particle) in self.particles.iter().enumerate() {
-        //     tree.add([particle.x, particle.y], index).unwrap();
+        // for (index, particle) in
+        //     self.particles.iter().enumerate()
+        // {
+        //     tree.add([particle.x, particle.y], index)
+        //         .unwrap();
         // }
 
         for i in 0..self.num_of_horizontal_grids {
@@ -264,15 +333,22 @@ impl Canvas {
 
                 // Find the two closest particles to the stick.
                 let mut closest_part = [
-                    Rc::new(RefCell::new(&self.particles[0])),
-                    Rc::new(RefCell::new(&self.particles[1])),
+                    Rc::new(RefCell::new(
+                        &self.particles[0],
+                    )),
+                    Rc::new(RefCell::new(
+                        &self.particles[1],
+                    )),
                 ];
-                let mut closest_dist = [f64::MAX, f64::MAX];
+                let mut closest_dist =
+                    [f64::MAX, f64::MAX];
 
+                // mosaikekkan
                 // let indices = tree
                 //     .within(
                 //         &[x, y],
-                //         ripple_effect_range_max * ripple_effect_range_max,
+                //         ripple_effect_range_max
+                //             * ripple_effect_range_max,
                 //         &squared_euclidean,
                 //     )
                 //     .unwrap();
@@ -280,53 +356,68 @@ impl Canvas {
                 // for (_, &index) in indices {
                 for p in &self.particles {
                     // let p = &self.particles[index];
-                    let dist = ((p.x - x).powi(2) + (p.y - y).powi(2)).sqrt();
+                    let dist = ((p.x - x).powi(2)
+                        + (p.y - y).powi(2))
+                    .sqrt();
 
                     if dist < closest_dist[0] {
-                        closest_dist[1] = closest_dist[0];
-                        closest_part[1] = closest_part[0].clone();
+                        closest_dist[1] =
+                            closest_dist[0];
+                        closest_part[1] =
+                            closest_part[0].clone();
                         closest_dist[0] = dist;
-                        closest_part[0] = Rc::new(RefCell::new(p));
+                        closest_part[0] =
+                            Rc::new(RefCell::new(p));
                     } else if dist < closest_dist[1] {
                         closest_dist[1] = dist;
-                        closest_part[1] = Rc::new(RefCell::new(p));
+                        closest_part[1] =
+                            Rc::new(RefCell::new(p));
                     }
                 }
 
-                // If we were to just use the angle of the nearest
-                // particle, the animation will not look smooth,
-                // and it will have jagged appearance.
-                // It is because they are updated only once
-                // per stick per frame, based on the nearest
-                // particle at that moment in time. This can
-                // cause adrupt changes in angle from frame
-                // to frame, and will lead to jagged appearance.
+                // If we were to just use the angle
+                // of the closest particle, the animation
+                // will not look smooth, and it will have
+                // jagged appearance. It is because they are
+                // updated only once per stick per frame,
+                // based on the closest particle at that
+                // moment in time. This can cause adrupt
+                // changes in angle from frame to frame,
+                // and will lead to jagged appearance.
                 //
                 // To prevent this, we want to interpolate
                 // the angle based on the distance to the
                 // to closest particles. We are using
                 // a weighted average of the angles of
-                // the particles where the weights are based
-                // on the distance of each particle to the stick.
-                // This would result in a more gradual change
-                // in angle for the stick.
+                // the particles where the weights are
+                // based on the distance of each particle
+                // to the stick. This would result
+                // in a more gradual change in angle
+                // for the stick.
                 let mut angle = 0.0;
-                let total_dist = closest_dist[0] + closest_dist[1];
+                let total_dist =
+                    closest_dist[0] + closest_dist[1];
 
                 if total_dist > 0.0 {
-                    let weight_0 = closest_dist[1] / total_dist;
+                    let weight_0 =
+                        closest_dist[1] / total_dist;
                     let weight_1 = 1.0 - weight_0;
-                    let part_0 = closest_part[0].borrow();
-                    let part_1 = closest_part[1].borrow();
-                    angle = part_0.angle * weight_0 + part_1.angle * weight_1;
+                    let part_0 =
+                        closest_part[0].borrow();
+                    let part_1 =
+                        closest_part[1].borrow();
+                    angle = part_0.angle * weight_0
+                        + part_1.angle * weight_1;
                 }
 
-                // If the closest distance to particles is
-                // more than 8 units away, we want
-                // the length of the stick to be fixed to 2px.
-                // If not, then have a proportional size;
-                // closer to particles, bigger.
-                let dist_ratio = total_dist / ripple_effect_range_max;
+                // If the closest distance to particles
+                // is more than 8 units away, we want
+                // the length of the stick to be fixed
+                // to 2px. If not, then have
+                // a proportional size; closer to
+                // the particles, bigger it gets.
+                let dist_ratio = total_dist
+                    / ripple_effect_range_max;
 
                 let stick_size = self
                     .unit_size
@@ -335,7 +426,9 @@ impl Canvas {
                     .min(self.unit_size);
 
                 self.ctx.save();
-                self.ctx.translate(x, y).unwrap_or(());
+                self.ctx
+                    .translate(x, y)
+                    .unwrap_or(());
                 self.ctx.rotate(angle).unwrap_or(());
                 self.ctx.begin_path();
                 self.ctx.move_to(0_f64, 0_f64);
@@ -348,21 +441,31 @@ impl Canvas {
         // ------------------------------------
         // Particles
         // ------------------------------------
-        self.ctx.set_fill_style(&self.color.as_str().into());
+        self.ctx.set_fill_style(
+            &self.color.as_str().into(),
+        );
 
         let radius = self.particle_size / 2.0;
 
         for p in &self.particles {
             // Translate the canvas to the particle position.
             self.ctx.save();
-            self.ctx.translate(p.x, p.y).unwrap_or(());
+            self.ctx
+                .translate(p.x, p.y)
+                .unwrap_or(());
 
             // Rotate the canvas based on the particle angle.
             self.ctx.rotate(p.angle).unwrap_or(());
 
             self.ctx.begin_path();
             self.ctx
-                .arc(0_f64, 0_f64, radius, 0_f64, 2.0 * PI)
+                .arc(
+                    0_f64,
+                    0_f64,
+                    radius,
+                    0_f64,
+                    2.0 * PI,
+                )
                 .unwrap_or(());
             self.ctx.fill();
 
@@ -371,7 +474,11 @@ impl Canvas {
     }
 }
 
-fn generate_particles(width: f64, height: f64, count: usize) -> Vec<Particle> {
+fn generate_particles(
+    width: f64,
+    height: f64,
+    count: usize,
+) -> Vec<Particle> {
     let mut rng = rand::thread_rng();
     let mut particles = Vec::new();
 

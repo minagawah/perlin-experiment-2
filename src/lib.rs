@@ -13,7 +13,8 @@ use wasm_bindgen::JsValue;
 // want to use `wee_alloc`, you can safely delete this.
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+static ALLOC: wee_alloc::WeeAlloc =
+    wee_alloc::WeeAlloc::INIT;
 
 pub fn exit(message: &str) {
     let v = JsValue::from_str(message);
@@ -24,12 +25,17 @@ pub fn exit(message: &str) {
 
 #[wasm_bindgen(start)]
 pub fn start() {
-    console_log::init().expect("console_log::init failed");
+    console_log::init()
+        .expect("console_log::init failed");
     console_error_panic_hook::set_once();
 
     #[cfg(debug_assertions)]
-    web_sys::console::log_1(&JsValue::from_str("debug"));
+    web_sys::console::log_1(&JsValue::from_str(
+        "debug",
+    ));
 
     #[cfg(not(debug_assertions))]
-    web_sys::console::log_1(&JsValue::from_str("release"));
+    web_sys::console::log_1(&JsValue::from_str(
+        "release",
+    ));
 }

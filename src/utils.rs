@@ -15,7 +15,10 @@ pub fn exit(message: &str) {
     std::process::abort();
 }
 
-pub fn debounce<F>(mut func: F, duration: Duration) -> impl FnMut()
+pub fn debounce<F>(
+    mut func: F,
+    duration: Duration,
+) -> impl FnMut()
 where
     F: FnMut(),
 {
@@ -23,8 +26,11 @@ where
 
     move || {
         let now = Instant::now();
-        let elapsed = now.duration_since(last_call_time).as_millis() as f64;
-        let should_call = elapsed >= duration.as_millis() as f64;
+        let elapsed = now
+            .duration_since(last_call_time)
+            .as_millis() as f64;
+        let should_call =
+            elapsed >= duration.as_millis() as f64;
 
         if should_call {
             func();
@@ -34,63 +40,90 @@ where
 }
 
 pub async fn timer(msec: i32) -> Result<(), JsValue> {
-    let promise = js_sys::Promise::new(&mut |resolve, _| {
-        get_window()
+    let promise = js_sys::Promise::new(
+        &mut |resolve, _| {
+            get_window()
             .unwrap()
             .set_timeout_with_callback_and_timeout_and_arguments_0(
                 &resolve, msec,
             )
             .unwrap();
-    });
-    let future = wasm_bindgen_futures::JsFuture::from(promise);
+        },
+    );
+    let future =
+        wasm_bindgen_futures::JsFuture::from(promise);
     future.await?;
     Ok(())
 }
 
-pub fn get_window() -> Result<web_sys::Window, String> {
-    web_sys::window().ok_or_else(|| "No window".into())
+pub fn get_window() -> Result<web_sys::Window, String>
+{
+    web_sys::window()
+        .ok_or_else(|| "No window".into())
 }
 
-pub fn get_document() -> Result<web_sys::Document, String> {
-    get_window()?.document().ok_or_else(|| "No document".into())
+pub fn get_document(
+) -> Result<web_sys::Document, String> {
+    get_window()?
+        .document()
+        .ok_or_else(|| "No document".into())
 }
 
 pub fn device_pixel_ratio() -> f64 {
-    get_window().map_or(1_f64, |w| w.device_pixel_ratio())
+    get_window()
+        .map_or(1_f64, |w| w.device_pixel_ratio())
 }
 
 pub fn get_window_size() -> (f64, f64) {
     match get_window() {
         Ok(win) => (
-            win.inner_width().map_or(0_f64, f64_from_js),
-            win.inner_height().map_or(0_f64, f64_from_js),
+            win.inner_width()
+                .map_or(0_f64, f64_from_js),
+            win.inner_height()
+                .map_or(0_f64, f64_from_js),
         ),
         Err(_) => (0_f64, 0_f64),
     }
 }
 
-pub fn request_animation_frame(f: &Closure<dyn FnMut()>) {
+pub fn request_animation_frame(
+    f: &Closure<dyn FnMut()>,
+) {
     get_window()
         .unwrap()
-        .request_animation_frame(f.as_ref().unchecked_ref())
-        .expect("Failed to start request_animation_frame");
+        .request_animation_frame(
+            f.as_ref().unchecked_ref(),
+        )
+        .expect(
+            "Failed to start request_animation_frame",
+        );
 }
 
-pub fn request_animation_frame_future() -> LocalBoxFuture<'static, ()> {
-    let f = callback_future::CallbackFuture::new(|complete| {
-        get_window()
-            .expect("Should have window")
-            .request_animation_frame(
-                Closure::once_into_js(move || complete(()))
+pub fn request_animation_frame_future(
+) -> LocalBoxFuture<'static, ()> {
+    let f = callback_future::CallbackFuture::new(
+        |complete| {
+            get_window()
+                .expect("Should have window")
+                .request_animation_frame(
+                    Closure::once_into_js(
+                        move || complete(()),
+                    )
                     .as_ref()
                     .unchecked_ref(),
-            )
-            .expect("should register `requestAnimationFrame` OK");
-    });
+                )
+                .expect(
+                    "should register \
+                     `requestAnimationFrame` OK",
+                );
+        },
+    );
     f.boxed_local()
 }
 
-pub fn get_wrapper_element(name: &str) -> Result<web_sys::HtmlElement, String> {
+pub fn get_wrapper_element(
+    name: &str,
+) -> Result<web_sys::HtmlElement, String> {
     let elem: web_sys::Element = get_document()?
         .get_element_by_id(name)
         .ok_or(format!("No element: {}", name))?;
@@ -100,19 +133,24 @@ pub fn get_wrapper_element(name: &str) -> Result<web_sys::HtmlElement, String> {
         .map_err(|e| e.to_string())?)
 }
 
-pub fn get_canvas(id: &str) -> Result<web_sys::HtmlCanvasElement, String> {
+pub fn get_canvas(
+    id: &str,
+) -> Result<web_sys::HtmlCanvasElement, String> {
     let canvas = get_document()?
         .query_selector(id)
         .map_err(|_| format!("No element: {}", id))?
         .unwrap()
         .dyn_into::<web_sys::HtmlCanvasElement>()
-        .map_err(|_| "Failed to get canvas".to_string())?;
+        .map_err(|_| {
+            "Failed to get canvas".to_string()
+        })?;
     Ok(canvas)
 }
 
 pub fn get_ctx(
     canvas: &web_sys::HtmlCanvasElement,
-) -> Result<web_sys::CanvasRenderingContext2d, String> {
+) -> Result<web_sys::CanvasRenderingContext2d, String>
+{
     let ctx = canvas
         .get_context("2d")
         .map_err(|_| "Failed get 2D Context".to_string())?
@@ -122,9 +160,14 @@ pub fn get_ctx(
     Ok(ctx)
 }
 
-pub fn get_canvas_size(el: &HtmlCanvasElement) -> (f64, f64) {
+pub fn get_canvas_size(
+    el: &HtmlCanvasElement,
+) -> (f64, f64) {
     let rect: DomRect = el.get_bounding_client_rect();
-    (rect.right() - rect.left(), rect.bottom() - rect.top())
+    (
+        rect.right() - rect.left(),
+        rect.bottom() - rect.top(),
+    )
 }
 
 pub fn rad_to_deg(rad: f64) -> f64 {
@@ -134,12 +177,18 @@ pub fn deg_to_rad(deg: f64) -> f64 {
     deg * (PI / 180.0)
 }
 
-pub fn fixed_decimals<F: Float>(value: F, digits: F) -> F {
+pub fn fixed_decimals<F: Float>(
+    value: F,
+    digits: F,
+) -> F {
     (value * digits).round() / digits
 }
 
 pub fn lazy_round<F: Float>(value: F) -> F {
-    fixed_decimals(value, NumCast::from(100.00).unwrap())
+    fixed_decimals(
+        value,
+        NumCast::from(100.00).unwrap(),
+    )
 }
 
 /// Get the norm for `val` between `min` and `max`.
@@ -159,7 +208,10 @@ pub fn f64_from_js(js: JsValue) -> f64 {
     js.as_f64().unwrap_or_default()
 }
 
-pub fn f64_cmp(a: &f64, b: &f64) -> std::cmp::Ordering {
+pub fn f64_cmp(
+    a: &f64,
+    b: &f64,
+) -> std::cmp::Ordering {
     a.partial_cmp(b).unwrap()
 }
 
@@ -178,12 +230,17 @@ pub struct RgbColor {
 }
 
 pub fn rgb_to_hex(rgb_color: &RgbColor) -> String {
-    format!("#{:02x}{:02x}{:02x}", rgb_color.r, rgb_color.g, rgb_color.b)
+    format!(
+        "#{:02x}{:02x}{:02x}",
+        rgb_color.r, rgb_color.g, rgb_color.b
+    )
 }
 
 pub fn hex_to_rgb(hex_color: &str) -> RgbColor {
-    let hex_value = hex::decode(hex_color.trim_start_matches('#'))
-        .expect("Invalid hex code");
+    let hex_value = hex::decode(
+        hex_color.trim_start_matches('#'),
+    )
+    .expect("Invalid hex code");
     match hex_value.as_slice() {
         [r, g, b] => RgbColor {
             r: *r,
@@ -194,15 +251,28 @@ pub fn hex_to_rgb(hex_color: &str) -> RgbColor {
     }
 }
 
-pub fn color_change_intensity_rgb(rbg: &RgbColor, intensity: f64) -> RgbColor {
-    let r = ((rbg.r as f64 * intensity) as i16).max(0).min(255) as u8;
-    let g = ((rbg.g as f64 * intensity) as i16).max(0).min(255) as u8;
-    let b = ((rbg.b as f64 * intensity) as i16).max(0).min(255) as u8;
+pub fn color_change_intensity_rgb(
+    rbg: &RgbColor,
+    intensity: f64,
+) -> RgbColor {
+    let r = ((rbg.r as f64 * intensity) as i16)
+        .max(0)
+        .min(255) as u8;
+    let g = ((rbg.g as f64 * intensity) as i16)
+        .max(0)
+        .min(255) as u8;
+    let b = ((rbg.b as f64 * intensity) as i16)
+        .max(0)
+        .min(255) as u8;
     RgbColor { r, g, b }
 }
 
-pub fn color_change_intensity_hex(hex_color: &str, intensity: f64) -> String {
+pub fn color_change_intensity_hex(
+    hex_color: &str,
+    intensity: f64,
+) -> String {
     let rgb = hex_to_rgb(hex_color);
-    let new_rgb = color_change_intensity_rgb(&rgb, intensity);
+    let new_rgb =
+        color_change_intensity_rgb(&rgb, intensity);
     rgb_to_hex(&new_rgb)
 }
