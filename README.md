@@ -60,11 +60,23 @@ If we had properties managed in `App`, I would have needed to pass them, and tha
 ```rust
 // src/app.rs
 
+use crate::proxy::Proxy;
+
+#[wasm_bindgen]
+pub struct App {
+    proxy: Arc<Mutex<Proxy>>,
+}
+
+#[wasm_bindgen]
 impl App {
     #[wasm_bindgen(constructor)]
-    pub fn new(params: &JsValue) -> Result<App, JsValue> {
+    pub fn new(
+        params: &JsValue,
+    ) -> Result<App, JsValue> {
         Ok(App {
-            proxy: Arc::new(Mutex::new(Proxy::new(params))),
+            proxy: Arc::new(Mutex::new(Proxy::new(
+                params,
+            ))),
         })
     }
 
@@ -104,14 +116,19 @@ pub struct Proxy {
 impl Proxy {
     pub fn new(params: &JsValue) -> Self {
         let config: Config =
-            serde_wasm_bindgen::from_value(params.clone()).unwrap();
+            serde_wasm_bindgen::from_value(
+                params.clone(),
+            )
+            .unwrap();
 
         let bgcolor: String = config.bgcolor.clone();
         let color: String = config.color;
 
-        let element = get_canvas("#perlin-experiment").unwrap();
-        let canvas =
-            Rc::new(RefCell::new(Canvas::new(element, bgcolor, color)));
+        let element =
+            get_canvas("#perlin-experiment").unwrap();
+        let canvas = Rc::new(RefCell::new(
+            Canvas::new(element, bgcolor, color),
+        ));
 
         canvas.borrow_mut().register_listeners();
         canvas.borrow_mut().update_size();
@@ -133,7 +150,8 @@ impl Canvas {
     //...
 
     pub fn register_listeners(&mut self) {
-        let self_rc = Rc::new(RefCell::new(self.clone()));
+        let self_rc =
+            Rc::new(RefCell::new(self.clone()));
 
         let mut debounced_update_size = debounce(
             move || {
@@ -143,13 +161,17 @@ impl Canvas {
             Duration::from_millis(500),
         );
 
-        let callback = Closure::wrap(Box::new(move || {
-            debounced_update_size();
-        }) as Box<dyn FnMut()>);
+        let callback =
+            Closure::wrap(Box::new(move || {
+                debounced_update_size();
+            })
+                as Box<dyn FnMut()>);
 
         get_window()
             .expect("No window")
-            .set_onresize(Some(callback.as_ref().unchecked_ref()));
+            .set_onresize(Some(
+                callback.as_ref().unchecked_ref(),
+            ));
 
         callback.forget();
     }
@@ -160,7 +182,10 @@ and here is `debounce` function:
 ```rust
 // src/utils.rs
 
-pub fn debounce<F>(mut func: F, duration: Duration) -> impl FnMut()
+pub fn debounce<F>(
+    mut func: F,
+    duration: Duration,
+) -> impl FnMut()
 where
     F: FnMut(),
 {
@@ -168,8 +193,11 @@ where
 
     move || {
         let now = Instant::now();
-        let elapsed = now.duration_since(last_call_time).as_millis() as f64;
-        let should_call = elapsed >= duration.as_millis() as f64;
+        let elapsed = now
+            .duration_since(last_call_time)
+            .as_millis() as f64;
+        let should_call =
+            elapsed >= duration.as_millis() as f64;
 
         if should_call {
             func();
@@ -213,12 +241,17 @@ pub struct Canvas {
         self.frame += 1;
         let mut rng = rand::thread_rng();
 
-        for particle in &mut self.particles {
+        for p in &mut self.particles {
+            let w = self.width;
+            let h = self.height;
+
             let noise_val = self.noise.get([
-                (particle.x / self.width) + rng.gen_range(-0.1, 0.1),
-                (particle.y / self.height) + rng.gen_range(-0.1, 0.1),
+                (p.x / w) + rng.gen_range(-0.1, 0.1),
+                (p.y / h) + rng.gen_range(-0.1, 0.1),
                 self.frame as f64 / 100.0,
             ]);
+
+            let angle = noise_val * PI * 2.0;
       //...
     }
 ```
@@ -233,12 +266,13 @@ and for `draw()`, we are drawing particles and sticks.
         for i in 0..self.num_of_horizontal_grids {
             let y = i as f64 * self.unit_size;
             for j in 0..self.num_of_vertical_grids {
+                let x = j as f64 * self.unit_size;
                 //...
             }
         }
 
         // Particles
-        for particle in &self.particles {
+        for p in &self.particles {
             //...
         }
     }
@@ -372,6 +406,22 @@ So, here's what I have:
 Notice that I use `<script type="module">` so that the browser
 would understand the `import` syntax.
 
+### 4-2. cargo fmt
+
+Looking into [rustfmt.toml](rustfmt.toml),
+you see the setting:
+
+```toml
+format_strings = true
+```
+
+which works only for the Nightly build.  
+So, you need:
+
+```bash
+cargo +nightly fmt
+```
+
 ## 5. What I did
 
 ### Rust + wasm-pack
@@ -435,8 +485,24 @@ npm install --save-dev @babel/cli @babel/core @babel/preset-env \
 
 ## 6. License
 
-Dual-licensed under either of the followings.  
+Dual-licensed under MIT or the [UNLICENSE](https://unlicense.org/).  
 Choose at your option.
 
-- The UNLICENSE ([LICENSE.UNLICENSE](LICENSE.UNLICENSE))
-- MIT license ([LICENSE.MIT](LICENSE.MIT))
+For external crates in use:
+
+```shell
+$ cargo license
+
+(MIT OR Apache-2.0) AND Unicode-DFS-2016 (1): unicode-ident
+0BSD OR Apache-2.0 OR MIT (1): adler
+Apache-2.0 (1): codespan-reporting
+Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT (2): wasi, wasi
+Apache-2.0 OR BSL-1.0 (1): ryu
+Apache-2.0 OR MIT (124): android_system_properties, async-attributes, async-channel, async-executor, async-global-executor, async-io, async-lock, async-std, async-task, atomic-waker, autocfg, bitflags, blocking, bumpalo, callback-future, cc, cfg-if, chrono, concurrent-queue, console_error_panic_hook, console_log, core-foundation-sys, crc32fast, crossbeam-channel, crossbeam-deque, crossbeam-epoch, crossbeam-utils, ctor, cxx, cxx-build, cxxbridge-flags, cxxbridge-macro, deflate, either, event-listener, fastrand, futures, futures-channel, futures-core, futures-executor, futures-io, futures-lite, futures-macro, futures-sink, futures-task, futures-util, getrandom, gif, gloo-timers, hermit-abi, hex, iana-time-zone, iana-time-zone-haiku, itoa, jpeg-decoder, js-sys, kv-log-macro, libc, link-cplusplus, lock_api, log, noise, num, num-bigint, num-complex, num-integer, num-iter, num-rational, num-rational, num-traits, num_cpus, once_cell, parking, parking_lot, parking_lot_core, pin-project-lite, pin-utils, png, polling, ppv-lite86, proc-macro2, quote, rand, rand_chacha, rand_core, rand_hc, rand_xorshift, rayon, rayon-core, scopeguard, scratch, serde, serde_derive, serde_json, smallvec, socket2, syn, syn, time, unicode-width, value-bag, version_check, waker-fn, wasm-bindgen, wasm-bindgen-backend, wasm-bindgen-futures, wasm-bindgen-macro, wasm-bindgen-macro-support, wasm-bindgen-shared, web-sys, weezl, winapi, winapi-i686-pc-windows-gnu, winapi-x86_64-pc-windows-gnu, windows-sys, windows-sys, windows-targets, windows_aarch64_gnullvm, windows_aarch64_msvc, windows_i686_gnu, windows_i686_msvc, windows_x86_64_gnu, windows_x86_64_gnullvm, windows_x86_64_msvc
+Apache-2.0 OR MIT OR Zlib (2): bytemuck, miniz_oxide
+BSD-3-Clause (1): instant
+MIT (12): color_quant, image, lerp, memoffset, miniz_oxide, redox_syscall, scoped_threadpool, serde-wasm-bindgen, slab, tiff, tokio, wasm-timer
+MIT OR Unlicense (4): byteorder, memchr, termcolor, winapi-util
+Unlicense or MIT (1): perlin-experiment-2
+Zlib (1): adler32
+```
