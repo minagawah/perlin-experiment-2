@@ -1,4 +1,4 @@
-/// Using Perlin noise for organic-
+// Using Perlin noise for organic-
 /// looking movement on particles.
 /// Also, drawing evenly spread
 /// sticks on the back which depict

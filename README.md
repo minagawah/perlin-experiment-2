@@ -8,6 +8,10 @@ Another attempt in using Perlin noise.
 
 ## 1. About
 
+**(2024.7.31)  
+This is outdated. For the better design, check out another project of mine:  
+[wasm-canvas-fractals](https://github.com/minagawah/wasm-canvas-fractals/)**
+
 Another attempt in using Perlin noise.
 
 Last time, only the noise calculation was done in WASM,
@@ -51,6 +55,15 @@ app.start();
 ```
 
 ### Step 2 - App.start
+
+**(2024.7.31)  
+The design in outdated. I initially used `Rc::new(RefCell::new(Canvas))`  
+for storing `canvas` in `Proxy`. Consequently, I had to launch  
+a separate process using `spawn_local` so that I could pass args.  
+However, this is only needed when exposing data to the scope of `wasm_bindgen`.  
+Since these data are not needed to be exposed, we can tell `wasm_bindgen`  
+to ignore, and we can call `Canvas` directly without `Rc` nor `RefCell`.  
+See `App` in [wasm-canvas-fractals](https://github.com/minagawah/wasm-canvas-fractals/blob/main/src/app.rs) which is another project of mine for examples.**
 
 Calling `App.start()` will essentially be calling `Proxy.run()`.  
 As you can see, it is using `wasm_bindgen_futures::spawn_local` to spawn a dedicated child process.  
