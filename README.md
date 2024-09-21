@@ -10,7 +10,7 @@ Another attempt in using Perlin noise.
 
 **(2024.7.31)  
 This is outdated. For the better design, check out another project of mine:  
-[rust-wasm-canvas-fractals](https://github.com/minagawah/rust-wasm-canvas-fractals/)**
+[rust-wasm-canvas-examples](https://github.com/minagawah/rust-wasm-canvas-example/)**
 
 Another attempt in using Perlin noise.
 
